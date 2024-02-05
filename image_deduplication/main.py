@@ -4,6 +4,82 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 
+# Supported image extensions by cv2.imread
+supported_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
+
+def _find_group(groups, image_name):
+    if groups[image_name] != image_name:
+        groups[image_name] = _find_group(groups, groups[image_name])
+    return groups[image_name]
+
+def _union(groups, image_name1, image_name2):
+    group1 = _find_group(groups, image_name1)
+    group2 = _find_group(groups, image_name2)
+    if group1 != group2:
+        groups[group2] = group1
+
+def _extract_orb_features(image: np.ndarray):
+    """
+    Function to extract ORB features from an image.
+
+    Parameters:
+    - image: np.ndarray, the input image
+
+    Returns:
+    - keypoints: list of keypoints
+    - descriptors: list of descriptors
+    """
+    # Initialize ORB
+    orb = cv2.ORB_create()
+
+    # Find the keypoints with ORB
+    keypoints = orb.detect(image, None)
+
+    # Compute the descriptors with ORB
+    keypoints, descriptors = orb.compute(image, keypoints)
+
+    return keypoints, descriptors
+
+def _match_images(query_img_desc, idx_desc):
+    """
+    A function to match images using their descriptors and return a similarity score.
+    
+    Parameters:
+    - query_img_desc: The descriptor of the query image
+    - idx_desc: The descriptor of the index image
+    
+    Returns:
+    - similarity_score: An integer representing the similarity score between the two images
+    """
+    # Initialize BFMatcher
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+
+    # Use BFMatcher to find the best matches
+    matches = bf.knnMatch(query_img_desc[1], idx_desc[1], k=2)
+
+    # Apply ratio test to find good matches
+    good_matches = [m for m, n in matches if m.distance < 0.75*n.distance]
+
+    # We need at least 50 matches to apply Homography
+    if len(good_matches) > 50:
+        # Prepare data for cv2.findHomography
+        src_pts = np.float32([query_img_desc[0][m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        dst_pts = np.float32([idx_desc[0][m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+
+        # Apply RANSAC
+        M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+
+        # See how many matches survive after applying RANSAC
+        matches_mask = mask.ravel().tolist()
+        num_good_matches = matches_mask.count(1)
+
+        # Use this as a similarity score
+        similarity_score = num_good_matches
+    else:
+        similarity_score = 0  # not enough matches
+
+    return similarity_score
+
 def get_image_paths(folder_path: str, depth: int=None, sanity_check: bool=False) -> list[str]:
     """
     Get the paths of readable images within the specified folder.
@@ -16,8 +92,6 @@ def get_image_paths(folder_path: str, depth: int=None, sanity_check: bool=False)
     Returns:
         list[str]: A list of paths to readable images within the folder.
     """
-    # Supported image extensions by cv2.imread
-    supported_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
 
     # List to hold the paths of images that can be read
     readable_image_paths = []
@@ -47,82 +121,41 @@ def get_image_paths(folder_path: str, depth: int=None, sanity_check: bool=False)
 
     return readable_image_paths
 
-def extract_orb_features(image: np.ndarray):
+def cluster_images(image_paths: list[str]) -> dict:
     """
-    Function to extract ORB features from an image.
-
+    Cluster the given images based on similarity and return a dictionary of grouped images.
+    
     Parameters:
-    - image: np.ndarray, the input image
-
+    image_paths (list): A list of file paths to the images to be clustered.
+    
     Returns:
-    - keypoints: list of keypoints
-    - descriptors: list of descriptors
+    dict: A dictionary where the keys are group identifiers and the values are lists of image file paths in each group.
     """
-    # Initialize ORB
-    orb = cv2.ORB_create()
 
-    # Find the keypoints with ORB
-    keypoints = orb.detect(image, None)
+    # Assert all images are supported
+    for image_path in image_paths:
+        ext = os.path.splitext(image_path)[1].lower()
+        assert ext in supported_extensions, f"The only file types supported are: {supported_extensions}. Attempted to read unsupported format: {ext}"
 
-    # Compute the descriptors with ORB
-    keypoints, descriptors = orb.compute(image, keypoints)
-
-    return keypoints, descriptors
-
-def calculate_similarity_matrix(image_descs: list[tuple]):
-    """
-    Calculate the similarity matrix for a list of image descriptors.
-
-    Args:
-    - image_descs: a list of tuples containing image descriptors
-
-    Returns:
-    - similarity_matrix: a 2D array representing the similarity between images
-    """
-    num_images = len(image_descs)
-    similarity_matrix = np.zeros((num_images, num_images))
-
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
-
-    for i in range(num_images):
-        for j in range(i + 1, num_images):
-            matches = bf.knnMatch(image_descs[i][1], image_descs[j][1], k=2)
-            good_matches = [m for m, n in matches if m.distance < 0.75 * n.distance]
-            similarity_matrix[i][j] = len(good_matches)
-
-    return similarity_matrix
-
-def cluster_images(indexed_images_names):
-    """
-    Cluster images based on their features using the DBSCAN algorithm.
-
-    Parameters:
-    - indexed_images_names: list of strings, the names of the indexed images
-
-    Returns:
-    - image_clusters: dictionary, mapping cluster labels to lists of image names
-    """
-    indexed_images_names = [name for name in indexed_images_names if name.endswith('.png')]
-    indexed_images = [cv2.imread(name) for name in indexed_images_names]
+    indexed_images = [cv2.imread(name) for name in image_paths]
 
     # Create descriptors for indexed images
-    indexed_img_descs = [extract_orb_features(image) for image in indexed_images]
+    indexed_img_descs = [_extract_orb_features(image) for image in indexed_images]
 
-    # Calculate similarity matrix
-    similarity_matrix = calculate_similarity_matrix(indexed_img_descs)
+    # Initialize a dictionary to store similarity groups
+    similarity_groups = {name: name for name in image_paths}
+    num_images = len(indexed_img_descs)
+    # Compare all images for similarity and update groups
+    for i in range(num_images):
+        for j in range(i + 1, num_images):
+            similarity = _match_images(indexed_img_descs[i], indexed_img_descs[j])
+            if similarity > 10:  # Adjust the similarity threshold as needed
+                _union(similarity_groups, image_paths[i], image_paths[j])
 
-    # Standardize the similarity matrix
-    scaler = StandardScaler()
-    standardized_similarity_matrix = scaler.fit_transform(similarity_matrix)
-
-    # Perform DBSCAN clustering
-    dbscan = DBSCAN(eps=1, min_samples=2, metric='euclidean')
-    cluster_labels = dbscan.fit_predict(standardized_similarity_matrix)
-
-    # Group images into clusters
-    image_clusters = {}
-    for image_name, cluster_label in zip(indexed_images_names, cluster_labels):
-        if cluster_label not in image_clusters:
-            image_clusters[cluster_label] = []
-        image_clusters[cluster_label].append(image_name)
-    return image_clusters
+    # Create a dictionary to store grouped images
+    grouped_images = {}
+    for image_name in image_paths:
+        group = _find_group(similarity_groups, image_name)
+        grouped_images.setdefault(group, []).append(image_name)
+    
+    return grouped_images

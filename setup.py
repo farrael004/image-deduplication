@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
     name="image-deduplication",
-    version="0.1.0",
+    version="0.1.2",
     description="Finds images that have a high degree of similarity",
     long_description=pathlib.Path("README.md").read_text(),
     long_description_content_type="text/markdown",
@@ -31,5 +31,5 @@ setuptools.setup(
     install_requires=["opencv-python", "numpy", "scikit-learn"],
     packages=setuptools.find_packages(),
     include_package_data=True,
-    entry_points={"console_scripts": ["image-deduplication = image_deduplication:main"]},
+    entry_points={"console_scripts": ["image-deduplication = image_deduplication.cli:main"]},
 )
