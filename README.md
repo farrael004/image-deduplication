@@ -23,8 +23,8 @@ image_paths = get_image_paths("path/to/images") # Returns list of image paths
 image_clusters = cluster_images(image_paths)
 
 # Print clusters
-for i, (group, images) in enumerate(image_clusters.items()):
-    print(f"Group {i}: {images}")
+for i, cluster in enumerate(image_clusters):
+    print(f"""Cluster {i}: {cluster}\n""")
 ```
 
 ### Find similar images from a list of files
@@ -40,8 +40,8 @@ image_paths = [
 image_clusters = cluster_images(image_paths)
 
 # Print clusters
-for i, (group, images) in enumerate(image_clusters.items()):
-    print(f"Group {i}: {images}")
+for i, cluster in enumerate(image_clusters):
+    print(f"""Cluster {i}: {cluster}\n""")
 ```
 
 ### CLI tool

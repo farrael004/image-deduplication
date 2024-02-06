@@ -121,15 +121,15 @@ def get_image_paths(folder_path: str, depth: int=None, sanity_check: bool=False)
 
     return readable_image_paths
 
-def cluster_images(image_paths: list[str]) -> dict:
+def cluster_images(image_paths: list[str]) -> list:
     """
-    Cluster the given images based on similarity and return a dictionary of grouped images.
+    Cluster the given images based on similarity and return a list of grouped images.
     
     Parameters:
     image_paths (list): A list of file paths to the images to be clustered.
     
     Returns:
-    dict: A dictionary where the keys are group identifiers and the values are lists of image file paths in each group.
+    list: A list where the each value is a list of image file paths that correspond to grouped images.
     """
 
     # Assert all images are supported
@@ -152,10 +152,13 @@ def cluster_images(image_paths: list[str]) -> dict:
             if similarity > 10:  # Adjust the similarity threshold as needed
                 _union(similarity_groups, image_paths[i], image_paths[j])
 
-    # Create a dictionary to store grouped images
-    grouped_images = {}
-    for image_name in image_paths:
-        group = _find_group(similarity_groups, image_name)
-        grouped_images.setdefault(group, []).append(image_name)
-    
-    return grouped_images
+    # Convert the similarity_groups dictionary into a format where each group is a list
+    intermediate_groups = {}
+    for image_name, group_name in similarity_groups.items():
+        group_root = _find_group(similarity_groups, image_name)
+        intermediate_groups.setdefault(group_root, []).append(image_name)
+
+    # Filter out groups with only one image and convert to a list of lists
+    final_groups = [group for group in intermediate_groups.values() if len(group) > 1]
+
+    return final_groups

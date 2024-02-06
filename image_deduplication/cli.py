@@ -1,4 +1,5 @@
 import argparse
+import json
 from image_deduplication import get_image_paths, cluster_images
 
 def main():
@@ -10,6 +11,4 @@ def main():
     image_paths = get_image_paths(args.image_folder) # Returns list of image paths
     image_clusters = cluster_images(image_paths)
 
-    # Print clusters
-    for i, (group, images) in enumerate(image_clusters.items()):
-        print(f"Group {i}: {images}")
+    print(json.dumps(image_clusters, indent=4))
