@@ -1,7 +1,7 @@
 # Image Deduplication
 
 <div style="text-align:center">
-    <img src="media/logo.webp" alt="drawing" style="width:200px;"/>
+    <img src="https://raw.githubusercontent.com/farrael004/image-deduplication/main/media/small_logo.png" alt="drawing" style="width:200px;"/>
 </div>
 
 Easily find images that have a high degree of similarity using either:
