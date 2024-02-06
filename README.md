@@ -43,3 +43,25 @@ image_clusters = cluster_images(image_paths)
 for i, (group, images) in enumerate(image_clusters.items()):
     print(f"Group {i}: {images}")
 ```
+
+### CLI tool
+```bash
+image-deduplication path/to/images
+```
+If you want to analyse the current working directory, you can simply use "." as the path.
+
+## Methodology
+
+Here is an overview of how this package clusters images by similarity using computer vision techniques and a union-find algorithm to group similar images together:
+
+1. Feature Extraction with ORB: We utilized the ORB (Oriented FAST and Rotated BRIEF) algorithm for extracting keypoints and descriptors from images. ORB is a fast, rotation-invariant, and robust feature extractor that identifies unique points in images, facilitating the comparison of different images based on their content.
+
+2. Image Matching: To determine the similarity between pairs of images, we employed a brute force matcher with the Hamming distance as a metric, optimized to find the best matches for the ORB descriptors. A ratio test filters out less reliable matches, ensuring that only the most similar keypoints contribute to the similarity score.
+
+3. Clustering with Union-Find: An implementation of the union-find algorithm is used to dynamically cluster images based on their similarity scores. This method efficiently merges images into groups as it iterates through all pairs, identifying connected components within the dataset. The union-find structure is key for minimizing redundant comparisons and accelerating the clustering process.
+
+4. Homography and RANSAC: For images with a sufficient number of good matches, we calculate a homography matrix using RANSAC (Random Sample Consensus). This step further refines the matching process by considering only geometrically consistent matches, enhancing the accuracy of similarity scores.
+
+5. Scalable Image Clustering: The end-to-end process, from feature extraction to dynamic clustering, is designed to handle a large number of images. By efficiently comparing images and grouping them based on visual similarity, this package can organize vast datasets into manageable clusters.
+
+This technology approach combines classic computer vision techniques with modern algorithmic strategies, offering a robust solution for organizing and analyzing large collections of images based on their visual content.
